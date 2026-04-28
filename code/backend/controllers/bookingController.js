@@ -1,5 +1,5 @@
 const Booking = require("../models/Booking");
-
+// New booking
 exports.getBookings = async (req, res) => {
     try {
       const bookings = await Booking.find()
