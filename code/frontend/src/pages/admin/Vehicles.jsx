@@ -1,55 +1,99 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import api from "../api/api";
 
 export default function VehicleManagement() {
   const [vehicles, setVehicles] = useState([]);
-  const [form, setForm] = useState({ type: "", number: "", seats: "" });
+  const [form, setForm] = useState({
+    type: "",
+    number: "",
+    seats: "",
+  });
 
-  // For editing
   const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Load vehicles
-  const loadVehicles = async () => {
-    const res = await api.get("/vehicles");
-    setVehicles(res.data);
+  // Reset the form to its default state
+  const resetForm = () => {
+    setForm({
+      type: "",
+      number: "",
+      seats: "",
+    });
+    setEditingId(null);
   };
 
+  // Handle input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setForm((previousForm) => ({
+      ...previousForm,
+      [name]: value,
+    }));
+  };
+
+  // Load all vehicles
+  const loadVehicles = async () => {
+    try {
+      setLoading(true);
+
+      const response = await api.get("/vehicles");
+      setVehicles(response.data);
+    } catch (error) {
+      console.error("Error loading vehicles:", error);
+      alert("Unable to load vehicles.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load vehicles when the component is mounted
   useEffect(() => {
     loadVehicles();
   }, []);
 
-  // Add vehicle
-  const addVehicle = async () => {
-    if (!form.type || !form.number || !form.seats)
-      return alert("Fill all fields!");
+  // Add or update a vehicle
+  const handleSubmit = async () => {
+    if (!form.type || !form.number || !form.seats) {
+      alert("Fill all fields!");
+      return;
+    }
 
-    await api.post("/vehicles", form);
-    setForm({ type: "", number: "", seats: "" });
-    loadVehicles();
+    try {
+      if (editingId) {
+        await api.put(`/vehicles/${editingId}`, form);
+      } else {
+        await api.post("/vehicles", form);
+      }
+
+      resetForm();
+      await loadVehicles();
+    } catch (error) {
+      console.error("Error saving vehicle:", error);
+      alert("Unable to save vehicle.");
+    }
   };
 
-  // Delete vehicle
-  const deleteVehicle = async (id) => {
-    await api.delete(`/vehicles/${id}`);
-    loadVehicles();
-  };
+  // Select a vehicle for editing
+  const handleEdit = (vehicle) => {
+    setEditingId(vehicle._id);
 
-  // Start edit
-  const startEdit = (v) => {
-    setEditingId(v._id);
     setForm({
-      type: v.type,
-      number: v.number,
-      seats: v.seats,
+      type: vehicle.type,
+      number: vehicle.number,
+      seats: vehicle.seats,
     });
   };
 
-  // Update vehicle
-  const updateVehicle = async () => {
-    await api.put(`/vehicles/${editingId}`, form);
-    setEditingId(null);
-    setForm({ type: "", number: "", seats: "" });
-    loadVehicles();
+  // Delete a vehicle
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/vehicles/${id}`);
+      await loadVehicles();
+    } catch (error) {
+      console.error("Error deleting vehicle:", error);
+      alert("Unable to delete vehicle.");
+    }
   };
 
   return (
@@ -58,43 +102,59 @@ export default function VehicleManagement() {
 
       <div style={{ marginBottom: "20px" }}>
         <input
+          name="type"
           placeholder="Type (Bus/Van/Car)"
           value={form.type}
-          onChange={(e) => setForm({ ...form, type: e.target.value })}
+          onChange={handleChange}
         />
 
         <input
+          name="number"
           placeholder="Number"
           value={form.number}
-          onChange={(e) => setForm({ ...form, number: e.target.value })}
+          onChange={handleChange}
         />
 
         <input
+          name="seats"
           placeholder="Seats"
           type="number"
           value={form.seats}
-          onChange={(e) => setForm({ ...form, seats: e.target.value })}
+          onChange={handleChange}
         />
 
-        {editingId ? (
-          <button onClick={updateVehicle}>Update Vehicle</button>
-        ) : (
-          <button onClick={addVehicle}>Add Vehicle</button>
+        <button onClick={handleSubmit}>
+          {editingId ? "Update Vehicle" : "Add Vehicle"}
+        </button>
+
+        {editingId && (
+          <button onClick={resetForm}>
+            Cancel
+          </button>
         )}
       </div>
 
       <h3>Vehicle List</h3>
 
-      <ul>
-        {vehicles.map((v) => (
-          <li key={v._id}>
-            {v.type} — {v.number} — {v.seats} seats
+      {loading ? (
+        <p>Loading vehicles...</p>
+      ) : (
+        <ul>
+          {vehicles.map((vehicle) => (
+            <li key={vehicle._id}>
+              {vehicle.type} — {vehicle.number} — {vehicle.seats} seats
 
-            <button onClick={() => startEdit(v)}>Edit</button>
-            <button onClick={() => deleteVehicle(v._id)}>Delete</button>
-          </li>
-        ))}
-      </ul>
+              <button onClick={() => handleEdit(vehicle)}>
+                Edit
+              </button>
+
+              <button onClick={() => handleDelete(vehicle._id)}>
+                Delete
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
